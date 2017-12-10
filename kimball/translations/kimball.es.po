@@ -1,0 +1,37 @@
+# $Id$
+#
+# Spanish translation of Drupal (general)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from files:
+#  kimball.module: n/a
+#  kimball.info: n/a
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2015-05-09 00:19+0200\n"
+"PO-Revision-Date: 2015-05-09 00:20+0100\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: Spanish <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+"Language: es\n"
+"X-Generator: Poedit 1.7.5\n"
+
+#: kimball.module:28
+msgid "If this budget has no parent budget, must have an accounting year number."
+msgstr "Si esta partida no tiene una partida padre, debe tener un año contable."
+
+#: kimball.info:0
+msgid "Core"
+msgstr "Núcleo"
+
+#: kimball.info:0
+msgid "Core of Kimball module"
+msgstr "Núcleo del módulo Kimball"
+
+#: kimball.info:0
+msgid "Kimball"
+msgstr "Kimball"

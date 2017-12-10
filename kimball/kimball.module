@@ -1,0 +1,200 @@
+<?php
+
+/**
+* @file
+* Módulo Kimball
+* Este módulo permite añadir funcionalidades extra
+*/
+
+/**
+* Implements hook_form_alter().
+**/
+function kimball_form_alter(&$form, &$form_state, $form_id) {
+
+  if($form_id == 'partida_contable_node_form'){
+    $form['field_total']['#access'] = FALSE;
+
+    array_unshift($form['#validate'], 'kimball_validate');
+  }
+
+}
+
+function kimball_validate ($form, &$form_state)  {
+
+  $year = $form_state['values']['field_anio_contable']['und']['0']['value'];
+  $parent_budget_id = $form_state['values']['field_partida_padre']['und']['0']['target_id'];
+  
+  if(node_load($parent_budget_id) === false && empty($year)){
+    form_set_error('field_anio_contable', t('If this budget has no parent budget, must have an accounting year number.'));
+  }
+}
+
+
+/**
+* Implements hook_node_insert().
+*/
+function kimball_node_insert($node){
+
+  if($node->type == 'asiento_contable'){
+
+    $budget_id = $node->field_partida_contable['und']['0']['target_id'];
+    $new_value = $node->field_importe['und']['0']['value'];
+
+    kimball_update_budget($budget_id, $new_value);
+
+  }
+}
+
+/**
+* Implements hook_node_delete().
+*/
+function kimball_node_delete($node){
+
+  if($node->type == 'asiento_contable'){
+
+    $budget_id = $node->field_partida_contable['und']['0']['target_id'];
+    $new_value = $node->field_importe['und']['0']['value'];
+    
+    if(node_load($budget_id) !== false){
+        kimball_update_budget($budget_id, 0-$new_value);
+    }
+  }
+  elseif($node->type == 'partida_contable'){
+
+    $parent_budget_id = kimball_get_parent_budget_id($node);
+    if($parent_budget_id != -1){
+      kimball_update_budget($parent_budget_id, 0-$node->field_total['und']['0']['value']);
+    }
+
+    // Remove referencing budgets
+    $subBudgets = new EntityFieldQuery();
+    $subBudgets->entityCondition('entity_type', 'node')
+      ->entityCondition('bundle', 'partida_contable')
+      ->fieldCondition('field_partida_padre', 'target_id', $node->nid);
+    $resultSubBudgets = $subBudgets->execute();
+
+    if (isset($resultSubBudgets['node'])) {
+      $items_nids = array_keys($resultSubBudgets['node']);
+      node_delete_multiple($items_nids);
+    }
+
+    // Remove referencing nodes
+    $accountingEntries = new EntityFieldQuery();
+    $accountingEntries->entityCondition('entity_type', 'node')
+      ->entityCondition('bundle', 'asiento_contable')
+      ->fieldCondition('field_partida_contable', 'target_id', $node->nid);
+    $resultAccountingEntries = $accountingEntries->execute();
+
+    if (isset($resultAccountingEntries['node'])) {
+      $items_nids = array_keys($resultAccountingEntries['node']);
+      node_delete_multiple($items_nids);
+    }
+
+  }
+}
+
+/**
+* Implements hook_node_update().
+*/
+function kimball_node_update($node){
+
+  if($node->type == 'asiento_contable'){
+
+    $old_node = node_load($node->nid);
+    $old_budget_id = $old_node->field_partida_contable['und']['0']['target_id'];
+    $old_value = $old_node->field_importe['und']['0']['value'];
+
+    $budget_id = $node->field_partida_contable['und']['0']['target_id'];
+    $new_value = $node->field_importe['und']['0']['value'];
+
+    if($old_budget_id == $budget_id){
+      $value_increment = $new_value-$old_value;
+      kimball_update_budget($budget_id, $value_increment);
+    }
+    else{
+      kimball_update_budget($old_budget_id, 0-$old_value);
+      kimball_update_budget($budget_id, $new_value);
+    }
+  }
+  else if($node->type == 'partida_contable'){    
+    $old_budget = node_load($node->nid);
+
+    $old_parent_budget_id = kimball_get_parent_budget_id($old_budget);
+    $new_parent_budget_id = kimball_get_parent_budget_id($node);
+
+    if($old_parent_budget_id != $new_parent_budget_id){
+
+      $budget_amount = empty($node->field_total) ? 0 : $node->field_total['und']['0']['value'];
+
+      kimball_update_budget($old_parent_budget_id, 0-$budget_amount);
+      kimball_update_budget($new_parent_budget_id, $budget_amount);
+    }
+  }
+}
+
+function kimball_get_parent_budget_id($budget){
+  if(empty($budget->field_partida_padre) || empty($budget->field_partida_padre['und']) || empty($budget->field_partida_padre['und']['0']['target_id'])){
+    $parentBudgetId = -1;
+  }
+  else{
+    $parentBudgetId = $budget->field_partida_padre['und']['0']['target_id'];
+  }
+  return $parentBudgetId;
+}
+
+function kimball_update_budget($budget_id, $new_value){
+  $budget = node_load($budget_id);
+
+  $previous_value = empty($budget->field_total) ? 0 : $budget->field_total['und']['0']['value'];
+
+  $budget_wrapper = entity_metadata_wrapper('node', $budget);
+  $budget_wrapper->field_total->set($previous_value + $new_value);
+  $budget_wrapper->save();
+
+  $parent_budget_id = kimball_get_parent_budget_id($budget);
+
+  if($parent_budget_id > 0){
+    kimball_update_budget($parent_budget_id, $new_value);
+  }
+}
+
+/**
+* Implements hook_block_info().
+*/
+function kimball_block_info() {
+  $blocks['kimball_budget_graph'] = array(
+    'info' => t('Graph of budget expenses'),
+    'cache' => DRUPAL_NO_CACHE,
+    'status' => 1,
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages' => 'partida/*',
+    'region' => 'content',
+    );
+
+  return $blocks;
+}
+
+/**
+* Implements hook_block_view().
+*/
+function kimball_block_view($delta = '') {
+  $block = array();
+
+  switch ($delta) {
+    case 'kimball_budget_graph':
+      $block['subject'] = t('Graph');
+      $block['content'] = '<canvas id="budget-graph"></canvas>';
+      break;
+
+  }
+  return $block;
+}
+
+function kimball_node_access($node, $op, $account){
+	if($node->field_grupo_scout['und']['0']['target_id'] != $account->field_grupo_scout['und']['0']['target_id']){
+		return NODE_ACCESS_DENY;
+	} else{
+		return NODE_ACCESS_IGNORE;
+	}
+}
+
