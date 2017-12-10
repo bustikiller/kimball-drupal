@@ -191,7 +191,7 @@ function kimball_block_view($delta = '') {
 }
 
 function kimball_node_access($node, $op, $account){
-	if($node->field_grupo_scout['und']['0']['target_id'] != $account->field_grupo_scout['und']['0']['target_id']){
+	if($op != "create" && $node->field_grupo_scout['und']['0']['target_id'] != $account->field_grupo_scout['und']['0']['target_id']){
 		return NODE_ACCESS_DENY;
 	} else{
 		return NODE_ACCESS_IGNORE;
