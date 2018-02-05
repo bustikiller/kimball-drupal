@@ -14,4 +14,15 @@ jQuery(document).ready(function(){
 	$('.field-name-field-anio-contable')
 		.add('.field-name-field-partida-de-material')
 		.hide();
+
+	$("form .field-name-og-group-ref").each(function(i, container){
+		var select = $(container).find("select");
+		var options = select.find("option");
+		if(options.size() === 2){
+			select.val(select.find("option:last").val());	
+			$(container).hide();
+		}
+	});
+
+	$(".content .field-name-og-group-ref").hide();
 });
